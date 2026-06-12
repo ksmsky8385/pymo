@@ -1545,12 +1545,17 @@ select_tip_module() {
   printf '> '
   read -r module
 
+  if [ -z "$module" ]; then
+    printf "\n${TAG_ERROR} module 번호가 입력되지 않았습니다.\n"
+    return 1
+  fi
+
   if [[ "$module" =~ ^[0-9]$ ]]; then
     module="0$module"
   fi
 
   if [ ! -d "$SCRIPT_DIR/resource/tips/$module" ]; then
-    printf "\n${TAG_WARN} 해당 module tip이 없습니다: %s\n" "$module"
+    printf "\n${TAG_ERROR} 해당 module tip이 없습니다: %s\n" "$module"
     return 1
   fi
 
@@ -1575,11 +1580,16 @@ select_tip_file() {
   printf '%s\n\n' "$tip_files"
   printf '> '
   read -r tip_index
+  
+  if [ -z "$tip_index" ]; then
+    printf "\n${TAG_ERROR} tip 번호가 입력되지 않았습니다.\n"
+    return 1
+  fi
 
   tip_file="$(get_tip_file_by_index "$module" "$tip_index")"
 
   if [ -z "$tip_file" ]; then
-    printf "\n${TAG_WARN} 해당 번호의 tip 파일이 없습니다: %s\n" "$tip_index"
+    printf "\n${TAG_ERROR} 해당 번호의 tip 파일이 없습니다: %s\n" "$tip_index"
     return 1
   fi
 
@@ -1835,7 +1845,7 @@ show_manual() {
 ask_continue() {
   local answer
 
-  printf '\n처음 메뉴로 돌아가시겠습니까? [Y/n] '
+  printf '\n처음 메뉴로 돌아가시겠습니까? [Y/n (no = exit)] '
   read -r answer
 
   case "$answer" in
