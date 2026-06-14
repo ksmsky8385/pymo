@@ -1745,7 +1745,7 @@ select_project_root() {
   printf '현재 Project Root:\n%s\n\n' "$PROJECT_ROOT"
   printf '새 Project Root 경로를 입력하세요.\n'
   printf '> '
-  read -r new_root
+  read -e -r new_root
 
   if [ ! -d "$new_root" ]; then
     printf "${TAG_ERROR} 존재하지 않는 경로입니다: %s\n" "$new_root"
