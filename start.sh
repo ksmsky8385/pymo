@@ -50,6 +50,7 @@ TAG_ERROR="${RED}[ERROR]${RESET}"
 TAG_SKIP="${BLUE}[SKIP]${RESET}"
 TAG_CHECK="${CYAN}[CHECK]${RESET}"
 TAG_CREATE="${GREEN}[CREATE]${RESET}"
+TAG_PART="${BLUE}[PART]${RESET}"
 TAG_TEST="${PY_BLUE}[TEST]${RESET}"
 TAG_STOP="${RED}[STOP]${RESET}"
 
@@ -1092,6 +1093,8 @@ run_module_06_tests() {
   local result=0
 
   printf "\n${TAG_TEST} python module 06 실행 테스트\n"
+  
+  printf "\n${TAG_PART} I: The Alembic\n"
 
   run_entry_file "$base_dir" "ft_alembic_0.py" || result=1
   run_entry_file "$base_dir" "ft_alembic_1.py" || result=1
@@ -1109,12 +1112,22 @@ run_module_06_tests() {
 	fi
 
   run_entry_file "$base_dir" "ft_alembic_5.py" || result=1
+  
+  printf "\n${TAG_PART} II: Distillation\n"
+  
   run_entry_file "$base_dir" "ft_distillation_0.py" || result=1
   run_entry_file "$base_dir" "ft_distillation_1.py" || result=1
+  
+  printf "\n${TAG_PART} III: The Great Transmutation\n"
+  
   run_entry_file "$base_dir" "ft_transmutation_0.py" || result=1
   run_entry_file "$base_dir" "ft_transmutation_1.py" || result=1
   run_entry_file "$base_dir" "ft_transmutation_2.py" || result=1
-	run_entry_file "$base_dir" "ft_kaboom_0.py" || result=1
+  
+  
+  printf "\n${TAG_PART} IV: Avoid the Explosion\n"
+  
+  run_entry_file "$base_dir" "ft_kaboom_0.py" || result=1
 
 	if ! should_skip_empty_file "$base_dir/ft_kaboom_1.py"; then
 		printf "\n${TAG_INFO} ft_kaboom_1.py는 의도된 예외가 발생됩니다.\n"
