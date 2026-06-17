@@ -166,10 +166,11 @@ MODULE_07_FILES=(
   "ex0/creatures.py"
   "ex0/factories.py"
   "ex1/__init__.py"
-  "ex1/capabilities.py"
+  "ex1/base.py"
   "ex1/creatures.py"
   "ex1/factories.py"
   "ex2/__init__.py"
+  "ex2/base.py"
   "ex2/strategies.py"
   "ex2/exceptions.py"
 )
@@ -367,9 +368,11 @@ get_module_status() {
       return 0
     fi
 
-    if [ -f "$file_path" ] && [ ! -s "$file_path" ]; then
-      has_empty=1
-    fi
+		if [ -f "$file_path" ] && [ ! -s "$file_path" ]; then
+			if [ "$(basename "$file_path")" != "__init__.py" ]; then
+				has_empty=1
+			fi
+		fi
   done < <(get_module_files "$module")
 
   if [ "$has_empty" -eq 1 ]; then
