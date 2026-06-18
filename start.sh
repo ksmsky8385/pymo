@@ -1794,6 +1794,49 @@ select_module_dir_name() {
 	sync_module_dir_names
 }
 
+update_helper_from_git() {
+  local answer
+  local behind_count
+
+  if [ ! -d "$SCRIPT_DIR/.git" ]; then
+    printf "${TAG_ERROR} 현재 헬퍼 디렉토리가 git 저장소가 아닙니다: %s\n" "$SCRIPT_DIR"
+    return 1
+  fi
+
+  if ! git -C "$SCRIPT_DIR" fetch origin main >/dev/null 2>&1; then
+    printf "${TAG_ERROR} 원격 저장소 확인에 실패했습니다.\n"
+    return 1
+  fi
+
+  behind_count="$(git -C "$SCRIPT_DIR" rev-list --count HEAD..origin/main 2>/dev/null)"
+
+  if [ -z "$behind_count" ] || [ "$behind_count" -eq 0 ]; then
+    printf "${TAG_INFO} 현재 최신버전입니다.\n"
+    return 0
+  fi
+
+  printf "\n${TAG_INFO} 헬퍼 업데이트가 가능합니다.\n"
+  printf '업데이트 로그:\n\n'
+  git -C "$SCRIPT_DIR" log --oneline --no-merges HEAD..origin/main
+  printf '\n'
+  read -r answer
+
+  case "$answer" in
+    n|N|no|NO)
+      printf "${TAG_SKIP} 헬퍼 업데이트를 건너뜁니다.\n"
+      return 0
+      ;;
+  esac
+
+  if git -C "$SCRIPT_DIR" pull --ff-only origin main; then
+    printf "${TAG_DONE} 헬퍼 업데이트가 완료되었습니다. 다시 실행해주세요.\n"
+    exit 0
+  fi
+
+  printf "${TAG_ERROR} 헬퍼 업데이트에 실패했습니다.\n"
+  return 1
+}
+
 helper_settings_menu() {
   local choice
 
@@ -1808,7 +1851,8 @@ helper_settings_menu() {
     printf '0. 설정 초기화\n'
     printf '1. 프로젝트 루트 변경\n'
     printf '2. 모듈 폴더명 서식 변경\n'
-    printf '3. 초기화면으로 돌아가기\n'
+    printf '3. python module helper 업데이트\n'
+    printf '4. 초기화면으로 돌아가기\n'
     print_line
     printf '> '
     read -r choice
@@ -1827,6 +1871,10 @@ helper_settings_menu() {
         pause
         ;;
       3)
+        update_helper_from_git
+        pause
+        ;;
+      4)
         return 0
         ;;
       *)
