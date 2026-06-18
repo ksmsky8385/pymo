@@ -182,7 +182,7 @@ MODULE_08_FILES=(
   "ex1/pyproject.toml"
   "ex2/oracle.py"
   "ex2/.env.example"
-  "ex2/.env"
+
   "ex2/.gitignore"
 )
 
@@ -547,11 +547,11 @@ run_flake8() {
 
   case "$status" in
     0)
-      (cd "$base_dir" || exit 1; flake8 .)
+      (cd "$base_dir" || exit 1; flake8 . --extend-exclude='*env')
       result=$?
       ;;
     2)
-      (cd "$base_dir" || exit 1; python3 -m flake8 .)
+      (cd "$base_dir" || exit 1; python3 -m flake8 . --extend-exclude='*env')
       result=$?
       ;;
     3)
@@ -574,7 +574,11 @@ run_mypy_command() {
   local mode="$1"
   local files=()
 
-  mapfile -d '' files < <(find . -type f -name '*.py' ! -path './main.py' -print0)
+  mapfile -d '' files < <(
+    find . \
+      -type d -name '*env' -prune -o \
+      -type f -name '*.py' ! -path './main.py' -print0
+  )
 
   if [ "${#files[@]}" -eq 0 ]; then
     printf "${TAG_SKIP} mypy 검사 대상 .py 파일이 없습니다.\n"
@@ -781,53 +785,154 @@ ask_remove_generated_files() {
   esac
 }
 
-run_in_venv() {
-  local base_dir="$1"
-  shift
+append_pyenv_config() {
+  local rc_file="$1"
+  local init_shell="$2"
+  local line
+  local lines=(
+    'export PYENV_ROOT="$HOME/.pyenv"'
+    '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"'
+    "eval \"\$(pyenv init - $init_shell)\""
+  )
 
-  if [ ! -f "$base_dir/.venv/bin/activate" ]; then
-    printf "${TAG_WARN} .venv가 없습니다: %s/.venv
-" "$base_dir"
-    printf '먼저 생성 및 패키지 설치를 진행하세요:
-'
-    printf '  cd "%s"
-' "$base_dir"
-    printf '  python3 -m venv .venv
-'
-    printf '  source .venv/bin/activate
-'
-    printf '  pip install -r requirements.txt 또는 필요한 패키지 설치
-'
+  [ -f "$rc_file" ] || touch "$rc_file"
+
+  for line in "${lines[@]}"; do
+    if ! grep -Fxq "$line" "$rc_file"; then
+      printf '\n%s\n' "$line" >> "$rc_file"
+    fi
+  done
+
+  printf "${TAG_DONE} pyenv 환경설정 등록 완료: %s\n" "$rc_file"
+}
+
+install_pyenv_for_user() {
+  local login_shell
+
+  if ! command -v git >/dev/null 2>&1; then
+    printf "${TAG_ERROR} pyenv 설치에 필요한 git 명령어가 없습니다.\n"
     return 1
+  fi
+
+  if [ ! -x "$HOME/.pyenv/bin/pyenv" ]; then
+    if [ -e "$HOME/.pyenv" ]; then
+      printf "${TAG_ERROR} %s 경로가 이미 존재하지만 정상적인 pyenv 설치가 아닙니다.\n" "$HOME/.pyenv"
+      return 1
+    fi
+
+    printf "\n${TAG_INFO} 사용자 로컬 경로에 pyenv를 설치합니다: %s\n" "$HOME/.pyenv"
+    git clone https://github.com/pyenv/pyenv.git "$HOME/.pyenv" || return 1
+  fi
+
+  login_shell="$(basename "${SHELL:-bash}")"
+
+  case "$login_shell" in
+    zsh)
+      append_pyenv_config "$HOME/.zshrc" "zsh" || return 1
+      ;;
+    bash)
+      append_pyenv_config "$HOME/.bashrc" "bash" || return 1
+      append_pyenv_config "$HOME/.profile" "bash" || return 1
+      ;;
+    *)
+      printf "${TAG_WARN} %s 셸의 자동 환경설정은 지원하지 않습니다. 현재 테스트에서만 pyenv를 사용합니다.\n" "$login_shell"
+      ;;
+  esac
+
+  export PYENV_ROOT="$HOME/.pyenv"
+  export PATH="$PYENV_ROOT/bin:$PATH"
+  eval "$(pyenv init - bash)"
+
+  if ! pyenv --version >/dev/null 2>&1; then
+    printf "${TAG_ERROR} 설치 후에도 pyenv 실행을 확인하지 못했습니다.\n"
+    return 1
+  fi
+
+  printf "${TAG_DONE} pyenv 사용자 로컬 설치 완료\n"
+}
+
+ensure_python_310_for_module() {
+  local base_dir="$1"
+  local answer
+  local pyenv_310
+
+  if python --version 2>&1 | grep -q '^Python 3\.10\.'; then
+    return 0
+  fi
+
+  printf "\n${TAG_WARN} 현재 python 버전이 3.10대가 아닙니다.\n"
+
+  if ! pyenv --version >/dev/null 2>&1; then
+    printf "${TAG_WARN} pyenv가 설치되어 있지 않습니다.\n"
+    printf '1. ~/.pyenv에 사용자 로컬 설치 후 계속\n'
+    printf '2. 무시하고 계속\n'
+    printf '3. 종료\n'
+    printf '> '
+    read -r answer
+
+    case "$answer" in
+      1)
+        install_pyenv_for_user || return 1
+        ;;
+      2)
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  fi
+
+  pyenv_310="$(pyenv versions --bare | grep '^3\.10\.' | head -n 1)"
+
+  if [ -z "$pyenv_310" ]; then
+    printf "\n${TAG_WARN} pyenv에 Python 3.10대 버전이 없습니다.\n"
+    printf '1. pyenv install 3.10.13 후 다시 검사\n'
+    printf '2. Python 3.10 검사를 무시하고 계속\n'
+    printf '3. 종료\n'
+    printf '> '
+    read -r answer
+
+    case "$answer" in
+      1)
+        pyenv install 3.10.13 || return 1
+        pyenv_310="3.10.13"
+        ;;
+      2)
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
   fi
 
   (
     cd "$base_dir" || exit 1
-    # shellcheck disable=SC1091
-    source .venv/bin/activate
-    "$@"
-    deactivate
-  )
+    pyenv local "$pyenv_310"
+  ) || return 1
+
+  printf "${TAG_DONE} module 08 Python 버전 설정 완료: %s\n" "$pyenv_310"
 }
 
-run_venv_file() {
+ensure_module_venv() {
   local base_dir="$1"
-  local file_path="$2"
+  local venv_dir
 
-  if [ ! -f "$base_dir/$file_path" ]; then
-    printf "${TAG_WARN} 진입점 파일 없음: %s/%s
-" "$base_dir" "$file_path"
-    return 1
-  fi
+  venv_dir="$(find "$base_dir" -mindepth 1 -maxdepth 1 -type d -name '*env' | head -n 1)"
 
-  if should_skip_empty_file "$base_dir/$file_path"; then
+  if [ -n "$venv_dir" ]; then
+    basename "$venv_dir"
     return 0
   fi
 
-  printf "
-${TAG_RUN} %s/.venv - python3 %s
-" "$base_dir" "$file_path"
-  run_in_venv "$base_dir" python3 "$file_path"
+  printf "\n${TAG_INFO} 가상환경이 없어 matrix_env를 생성합니다.\n" >&2
+  (
+    cd "$base_dir" || exit 1
+    python3 -m venv matrix_env
+  ) || return 1
+
+  printf 'matrix_env\n'
 }
 
 run_module_test_by_mapping() {
@@ -1162,40 +1267,328 @@ run_module_07_tests() {
 run_module_08_tests() {
   local _module="$1"
   local base_dir="$2"
+  local venv_dir
+  local venv_preexisting=0
   local result=0
 
-  printf "
-printf "\n${TAG_TEST} python module 08 실행 테스트\n"
-"
+  printf "\n${TAG_TEST} python module 08 실행 테스트\n"
 
-  if [ ! -f "$base_dir/.venv/bin/activate" ]; then
-    run_in_venv "$base_dir" true
-    return 1
+  venv_dir="$(find "$base_dir" -mindepth 1 -maxdepth 1 -type d -name '*env' | head -n 1)"
+
+  if [ -n "$venv_dir" ]; then
+    venv_preexisting=1
+    venv_dir="$(basename "$venv_dir")"
+    printf "${TAG_SKIP} 기존 가상환경이 감지되어 Python 버전 검사와 pyenv local 설정을 건너뜁니다: %s\n" "$venv_dir"
+  else
+    ensure_python_310_for_module "$base_dir" || return 1
+    venv_dir="$(ensure_module_venv "$base_dir")" || return 1
   fi
 
-  run_venv_file "$base_dir" "ex0/construct.py" || result=1
-  run_venv_file "$base_dir" "ex1/loading.py" || result=1
+  run_module_08_ex0 "$base_dir" "$venv_dir" || result=1
+  run_module_08_ex1 "$base_dir" "$venv_dir" "$venv_preexisting" || result=1
+  run_module_08_poetry "$base_dir" || result=1
+  run_module_08_ex2 "$base_dir" "$venv_dir" || result=1
 
-  if [ ! -f "$base_dir/ex2/.env" ]; then
-    printf "
-${TAG_WARN} ex2/.env 파일이 없습니다. oracle.py 기본 동작만 확인합니다.
-"
-  fi
-
-  run_venv_file "$base_dir" "ex2/oracle.py" || result=1
-
-  if ! should_skip_empty_file "$base_dir/ex2/oracle.py"; then
-    printf "
-${TAG_TEST} .venv 환경변수 override 실행
-"
-    run_in_venv "$base_dir" env MATRIX_MODE=production API_KEY=secret123 python3 ex2/oracle.py || result=1
-  fi
-
-  ask_remove_generated_files "$_module" "$base_dir"
+  ask_cleanup_module_08 "$base_dir" "$venv_dir"
 
   return "$result"
 }
 
+run_module_08_ex0() {
+  local base_dir="$1"
+  local venv_dir="$2"
+  local result=0
+
+  if should_skip_empty_file "$base_dir/ex0/construct.py"; then
+    return 0
+  fi
+
+  printf "\n${TAG_RUN} ${YELLOW}ex0${RESET} - python3 construct.py\n"
+  (
+    cd "$base_dir/ex0" || exit 1
+    python3 construct.py
+  ) || result=1
+
+  printf "\n${TAG_RUN} ${YELLOW}ex0${RESET} - venv activate 후 python3 construct.py\n"
+  (
+    cd "$base_dir" || exit 1
+    # shellcheck disable=SC1091
+    source "$venv_dir/bin/activate"
+    cd ex0 || exit 1
+    python3 construct.py
+    deactivate
+  ) || result=1
+
+  return "$result"
+}
+
+run_module_08_ex1() {
+  local base_dir="$1"
+  local venv_dir="$2"
+  local venv_preexisting="$3"
+  local result=0
+
+  if should_skip_empty_file "$base_dir/ex1/loading.py"; then
+    return 0
+  fi
+
+  printf "\n${TAG_RUN} ${YELLOW}ex1${RESET} - venv activate 후 loading.py 최초 실행\n"
+  (
+    cd "$base_dir" || exit 1
+    # shellcheck disable=SC1091
+    source "$venv_dir/bin/activate"
+    cd ex1 || exit 1
+    python3 loading.py
+    deactivate
+  ) || result=1
+
+  if [ "$venv_preexisting" -eq 1 ]; then
+    printf "${TAG_SKIP} 기존 가상환경이 감지되어 requirements.txt 설치를 건너뜁니다.\n"
+  elif [ -f "$base_dir/ex1/requirements.txt" ]; then
+    printf "\n${TAG_RUN} ${YELLOW}ex1${RESET} - pip install -r requirements.txt\n"
+    (
+      cd "$base_dir" || exit 1
+      # shellcheck disable=SC1091
+      source "$venv_dir/bin/activate"
+      cd ex1 || exit 1
+      pip install -r requirements.txt --no-cache-dir
+      deactivate
+    ) || result=1
+  fi
+
+  if [ "$venv_preexisting" -eq 1 ]; then
+    printf "\n${TAG_RUN} ${YELLOW}ex1${RESET} - 기존 venv에서 loading.py 재실행\n"
+  else
+    printf "\n${TAG_RUN} ${YELLOW}ex1${RESET} - requirements 설치 후 loading.py 재실행\n"
+  fi
+  (
+    cd "$base_dir" || exit 1
+    # shellcheck disable=SC1091
+    source "$venv_dir/bin/activate"
+    cd ex1 || exit 1
+    python3 loading.py
+    deactivate
+  ) || result=1
+
+  return "$result"
+}
+
+ensure_poetry_or_choose() {
+  local answer
+
+  if poetry --version >/dev/null 2>&1; then
+    return 0
+  fi
+
+  printf "\n${TAG_WARN} poetry가 설치되어 있지 않습니다.\n"
+  printf '1. pip install --user poetry 로 설치\n'
+  printf '2. poetry 테스트를 무시하고 계속\n'
+  printf '3. 종료\n'
+  printf '> '
+  read -r answer
+
+  case "$answer" in
+    1)
+      python3 -m pip install --user poetry
+      export PATH="$HOME/.local/bin:$PATH"
+      poetry --version >/dev/null 2>&1 || return 1
+      ;;
+    2)
+      return 2
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+run_module_08_poetry() {
+  local base_dir="$1"
+  local status
+
+  ensure_poetry_or_choose
+  status=$?
+
+  case "$status" in
+    0) ;;
+    2)
+      printf "${TAG_SKIP} poetry 테스트를 건너뜁니다.\n"
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  if [ ! -f "$base_dir/ex1/pyproject.toml" ]; then
+    printf "${TAG_WARN} ex1/pyproject.toml 파일이 없습니다. poetry 테스트를 건너뜁니다.\n"
+    return 0
+  fi
+
+  if should_skip_empty_file "$base_dir/ex1/loading.py"; then
+    return 0
+  fi
+
+  if [ -f "$base_dir/ex1/poetry.lock" ]; then
+    printf "${TAG_SKIP} ex1/poetry.lock이 감지되어 poetry install을 건너뜁니다.\n"
+  else
+    printf "\n${TAG_RUN} ${YELLOW}ex1${RESET} - poetry install\n"
+    (
+      cd "$base_dir/ex1" || exit 1
+      poetry install
+    ) || return 1
+  fi
+
+  printf "\n${TAG_RUN} ${YELLOW}ex1${RESET} - poetry run python loading.py\n"
+  (
+    cd "$base_dir/ex1" || exit 1
+    poetry run python loading.py
+  )
+}
+
+run_module_08_ex2() {
+  local base_dir="$1"
+  local venv_dir="$2"
+  local answer
+  local skip_example_env=0
+  local result=0
+
+  if should_skip_empty_file "$base_dir/ex2/oracle.py"; then
+    return 0
+  fi
+
+  printf "\n${TAG_INFO} python-dotenv 검사\n"
+  (
+    cd "$base_dir" || exit 1
+    # shellcheck disable=SC1091
+    source "$venv_dir/bin/activate"
+
+    if ! python3 -c 'import dotenv' >/dev/null 2>&1; then
+      pip install python-dotenv
+    fi
+
+    deactivate
+  ) || result=1
+
+  if [ -f "$base_dir/ex2/.env" ]; then
+    printf "\n${TAG_WARN} ex2/.env가 감지되었습니다.\n"
+    printf '1. 삭제\n'
+    printf '2. 무시하고 실행\n'
+    printf '3. 종료\n'
+    printf '> '
+    read -r answer
+
+    case "$answer" in
+      1)
+        rm -f "$base_dir/ex2/.env"
+        ;;
+      2)
+        skip_example_env=1
+        printf "${TAG_SKIP} 기존 .env를 유지하며 .env.example 복사 및 재실행을 건너뜁니다.\n"
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  fi
+
+  printf "\n${TAG_RUN} ${YELLOW}ex2${RESET} - oracle.py 실행\n"
+  (
+    cd "$base_dir" || exit 1
+    # shellcheck disable=SC1091
+    source "$venv_dir/bin/activate"
+    cd ex2 || exit 1
+    python3 oracle.py
+    deactivate
+  ) || result=1
+
+  if [ "$skip_example_env" -eq 1 ]; then
+    return "$result"
+  elif [ -f "$base_dir/ex2/.env.example" ]; then
+    printf "\n${TAG_RUN} ${YELLOW}ex2${RESET} - cp .env.example .env 후 oracle.py 실행\n"
+    (
+      cd "$base_dir" || exit 1
+      # shellcheck disable=SC1091
+      source "$venv_dir/bin/activate"
+      cd ex2 || exit 1
+      cp .env.example .env
+      python3 oracle.py
+      deactivate
+    ) || result=1
+  else
+    printf "${TAG_WARN} ex2/.env.example 파일이 없습니다.\n"
+  fi
+
+  return "$result"
+}
+
+cleanup_module_08_poetry_env() {
+  local base_dir="$1"
+  local env_path
+  local found=0
+
+  if ! poetry --version >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if [ ! -f "$base_dir/ex1/pyproject.toml" ]; then
+    return 0
+  fi
+
+  (
+    cd "$base_dir/ex1" || exit 0
+
+    poetry env list --full-path 2>/dev/null \
+      | sed 's/ (Activated)//' \
+      | while IFS= read -r env_path; do
+          [ -z "$env_path" ] && continue
+
+          case "$(basename "$env_path")" in
+            matrix-loading-*)
+              found=1
+
+              poetry env remove "$env_path" >/dev/null 2>&1 || true
+
+              if [ -d "$env_path" ]; then
+                rm -rf "$env_path"
+              fi
+
+              if [ ! -d "$env_path" ]; then
+                printf "${TAG_DONE} poetry 가상환경 및 캐시 삭제 완료: %s\n" "$env_path"
+              else
+                printf "${TAG_WARN} poetry 가상환경 및 캐시 삭제 실패: %s\n" "$env_path"
+              fi
+              ;;
+          esac
+        done
+  )
+}
+
+ask_cleanup_module_08() {
+  local base_dir="$1"
+  local venv_dir="$2"
+  local answer
+
+  printf "\n${TAG_WARN} module 08 테스트 산출물을 삭제하겠습니까? [Y/n] "
+  read -r answer
+
+  case "$answer" in
+    n|N|no|NO)
+      printf "${TAG_SKIP} module 08 산출물 삭제를 건너뜁니다.\n"
+      return 0
+      ;;
+  esac
+
+  [ -n "$venv_dir" ] && rm -rf "$base_dir/$venv_dir"
+  rm -f "$base_dir/.python-version"
+  find "$base_dir" -type f -name '*.png' -delete
+  rm -f "$base_dir/ex1/poetry.lock"
+  rm -f "$base_dir/ex2/.env"
+
+  cleanup_module_08_poetry_env "$base_dir"
+
+  printf "${TAG_DONE} module 08 테스트 산출물 삭제 완료\n"
+}
 
 run_module_09_tests() {
   local _module="$1"
