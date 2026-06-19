@@ -393,7 +393,7 @@ print_registered_modules_with_status() {
     status="$(get_module_status "$module")"
 
     case "$mode:$status" in
-      create:complete)
+      create:empty|create:complete)
         printf '%s. "%s" %b\n' "$module" "$name" "${GREEN}- Created${RESET}"
         ;;
       test:missing)
