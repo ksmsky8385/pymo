@@ -162,17 +162,8 @@ MODULE_07_FILES=(
   "capacitor.py"
   "tournament.py"
   "ex0/__init__.py"
-  "ex0/base.py"
-  "ex0/creatures.py"
-  "ex0/factories.py"
   "ex1/__init__.py"
-  "ex1/base.py"
-  "ex1/creatures.py"
-  "ex1/factories.py"
   "ex2/__init__.py"
-  "ex2/base.py"
-  "ex2/strategies.py"
-  "ex2/exceptions.py"
 )
 
 MODULE_08_FILES=(
