@@ -297,7 +297,7 @@ create_module_structure() {
   local file_path
 
   if ! is_registered_module "$module"; then
-    printf "${TAG_ERROR} 등록되지 않은 module 번호입니다: %s\n" "$module"
+    printf "\n${TAG_ERROR} 등록되지 않은 module 번호입니다: %s\n" "$module"
     return 1
   fi
 
@@ -313,9 +313,9 @@ create_module_structure() {
     if [ ! -e "$file_path" ]; then
       touch "$file_path"
       chmod +x "$file_path"
-      printf "${TAG_CREATE} %s\n" "$file_path"
+      printf "\n${TAG_CREATE} %s\n" "$file_path"
     else
-      printf "${TAG_SKIP} 이미 존재함: %s\n" "$file_path"
+      printf "\n${TAG_SKIP} 이미 존재함: %s\n" "$file_path"
     fi
   done < <(get_module_files "$module")
 
@@ -421,14 +421,14 @@ run_tests_for_module() {
   local base_dir
 
   if ! is_registered_module "$module"; then
-    printf "${TAG_ERROR} 등록되지 않은 module 번호입니다: %s\n" "$module"
+    printf "\n${TAG_ERROR} 등록되지 않은 module 번호입니다: %s\n" "$module"
     return 1
   fi
 
   base_dir="$(module_dir "$module")"
 
   if [ ! -d "$base_dir" ]; then
-    printf "${TAG_ERROR} 과제 폴더가 없습니다: %s\n" "$base_dir"
+    printf "\n${TAG_ERROR} 과제 폴더가 없습니다: %s\n" "$base_dir"
     return 1
   fi
 
@@ -483,9 +483,9 @@ ensure_local_bin_in_bashrc() {
 
   if ! grep -Fxq "$path_line" "$bashrc"; then
     printf '\n%s\n' "$path_line" >> "$bashrc"
-    printf "${TAG_DONE} 환경변수 등록 완료: %s\n" "$bashrc"
+    printf "\n${TAG_DONE} 환경변수 등록 완료: %s\n" "$bashrc"
   else
-    printf "${TAG_INFO} 환경변수가 이미 등록되어 있습니다.\n"
+    printf "\n${TAG_INFO} 환경변수가 이미 등록되어 있습니다.\n"
   fi
 }
 
@@ -525,7 +525,7 @@ ensure_tool_or_choose() {
         return 2
       fi
 
-      printf "${TAG_ERROR} 설치 후에도 %s 실행을 확인하지 못했습니다.\n" "$tool"
+      printf "\n${TAG_ERROR} 설치 후에도 %s 실행을 확인하지 못했습니다.\n" "$tool"
       return 1
       ;;
     2)
@@ -555,7 +555,7 @@ run_flake8() {
       result=$?
       ;;
     3)
-      printf "${TAG_SKIP} flake8 검사를 건너뜁니다.\n"
+      printf "\n${TAG_SKIP} flake8 검사를 건너뜁니다.\n"
       return 0
       ;;
     *)
@@ -581,7 +581,7 @@ run_mypy_command() {
   )
 
   if [ "${#files[@]}" -eq 0 ]; then
-    printf "${TAG_SKIP} mypy 검사 대상 .py 파일이 없습니다.\n"
+    printf "\n${TAG_SKIP} mypy 검사 대상 .py 파일이 없습니다.\n"
     return 0
   fi
 
@@ -610,7 +610,7 @@ run_mypy() {
       result=$?
       ;;
     3)
-      printf "${TAG_SKIP} mypy 검사를 건너뜁니다.\n"
+      printf "\n${TAG_SKIP} mypy 검사를 건너뜁니다.\n"
       return 0
       ;;
     *)
@@ -660,7 +660,7 @@ handle_static_check_error() {
       exit 0
       ;;
     *)
-      printf "${TAG_ERROR} 잘못된 입력입니다. 초기화면으로 돌아갑니다.\n"
+      printf "\n${TAG_ERROR} 잘못된 입력입니다. 초기화면으로 돌아갑니다.\n"
       return 1
       ;;
   esac
@@ -689,7 +689,7 @@ run_entry_file() {
   short_dir="$(basename "$run_dir")"
 
   if [ ! -f "$run_dir/$file_name" ]; then
-    printf "${TAG_WARN} 진입점 파일 없음: %s/%s\n" "$run_dir" "$file_name"
+    printf "\n${TAG_WARN} 진입점 파일 없음: %s/%s\n" "$run_dir" "$file_name"
     return 1
   fi
 
@@ -710,7 +710,7 @@ run_entry_file_with_args() {
   short_dir="$(basename "$run_dir")"
 
   if [ ! -f "$run_dir/$file_name" ]; then
-    printf "${TAG_WARN} 진입점 파일 없음: %s/%s\n" "$run_dir" "$file_name"
+    printf "\n${TAG_WARN} 진입점 파일 없음: %s/%s\n" "$run_dir" "$file_name"
     return 1
   fi
 
@@ -803,20 +803,20 @@ append_pyenv_config() {
     fi
   done
 
-  printf "${TAG_DONE} pyenv 환경설정 등록 완료: %s\n" "$rc_file"
+  printf "\n${TAG_DONE} pyenv 환경설정 등록 완료: %s\n" "$rc_file"
 }
 
 install_pyenv_for_user() {
   local login_shell
 
   if ! command -v git >/dev/null 2>&1; then
-    printf "${TAG_ERROR} pyenv 설치에 필요한 git 명령어가 없습니다.\n"
+    printf "\n${TAG_ERROR} pyenv 설치에 필요한 git 명령어가 없습니다.\n"
     return 1
   fi
 
   if [ ! -x "$HOME/.pyenv/bin/pyenv" ]; then
     if [ -e "$HOME/.pyenv" ]; then
-      printf "${TAG_ERROR} %s 경로가 이미 존재하지만 정상적인 pyenv 설치가 아닙니다.\n" "$HOME/.pyenv"
+      printf "\n${TAG_ERROR} %s 경로가 이미 존재하지만 정상적인 pyenv 설치가 아닙니다.\n" "$HOME/.pyenv"
       return 1
     fi
 
@@ -835,7 +835,7 @@ install_pyenv_for_user() {
       append_pyenv_config "$HOME/.profile" "bash" || return 1
       ;;
     *)
-      printf "${TAG_WARN} %s 셸의 자동 환경설정은 지원하지 않습니다. 현재 테스트에서만 pyenv를 사용합니다.\n" "$login_shell"
+      printf "\n${TAG_WARN} %s 셸의 자동 환경설정은 지원하지 않습니다. 현재 테스트에서만 pyenv를 사용합니다.\n" "$login_shell"
       ;;
   esac
 
@@ -844,11 +844,11 @@ install_pyenv_for_user() {
   eval "$(pyenv init - bash)"
 
   if ! pyenv --version >/dev/null 2>&1; then
-    printf "${TAG_ERROR} 설치 후에도 pyenv 실행을 확인하지 못했습니다.\n"
+    printf "\n${TAG_ERROR} 설치 후에도 pyenv 실행을 확인하지 못했습니다.\n"
     return 1
   fi
 
-  printf "${TAG_DONE} pyenv 사용자 로컬 설치 완료\n"
+  printf "\n${TAG_DONE} pyenv 사용자 로컬 설치 완료\n"
 }
 
 ensure_python_310_for_module() {
@@ -863,7 +863,7 @@ ensure_python_310_for_module() {
   printf "\n${TAG_WARN} 현재 python 버전이 3.10대가 아닙니다.\n"
 
   if ! pyenv --version >/dev/null 2>&1; then
-    printf "${TAG_WARN} pyenv가 설치되어 있지 않습니다.\n"
+    printf "\n${TAG_WARN} pyenv가 설치되어 있지 않습니다.\n"
     printf '1. ~/.pyenv에 사용자 로컬 설치 후 계속\n'
     printf '2. 무시하고 계속\n'
     printf '3. 종료\n'
@@ -912,7 +912,7 @@ ensure_python_310_for_module() {
     pyenv local "$pyenv_310"
   ) || return 1
 
-  printf "${TAG_DONE} module 08 Python 버전 설정 완료: %s\n" "$pyenv_310"
+  printf "\n${TAG_DONE} module 08 Python 버전 설정 완료: %s\n" "$pyenv_310"
 }
 
 ensure_module_venv() {
@@ -943,12 +943,12 @@ run_module_test_by_mapping() {
   tester="$(get_module_tester "$module")"
 
   if [ -z "$tester" ]; then
-    printf "${TAG_WARN} module %s 테스터 로직이 업데이트 되어있지 않습니다.\n" "$module"
+    printf "\n${TAG_WARN} module %s 테스터 로직이 업데이트 되어있지 않습니다.\n" "$module"
     return 1
   fi
 
   if ! declare -F "$tester" >/dev/null 2>&1; then
-    printf "${TAG_ERROR} 테스트 함수가 존재하지 않습니다: %s\n" "$tester"
+    printf "\n${TAG_ERROR} 테스트 함수가 존재하지 않습니다: %s\n" "$tester"
     return 1
   fi
 
@@ -979,7 +979,7 @@ run_generic_ex_file_tests() {
     file_path="$base_dir/$item"
 
     if [ ! -f "$file_path" ]; then
-      printf "${TAG_WARN} 파일 없음: %s\n" "$file_path"
+      printf "\n${TAG_WARN} 파일 없음: %s\n" "$file_path"
       result=1
       continue
     fi
@@ -1085,7 +1085,7 @@ run_module_04_tests() {
   printf "\n${TAG_TEST} python module 04 실행 테스트\n"
 
   if [ ! -f "$sample_src" ]; then
-    printf "${TAG_ERROR} module 04 테스트 리소스 파일이 없습니다: %s\n" "$sample_src"
+    printf "\n${TAG_ERROR} module 04 테스트 리소스 파일이 없습니다: %s\n" "$sample_src"
     return 1
   fi
 
@@ -1098,7 +1098,7 @@ run_module_04_tests() {
       cp "$etc_src/master.passwd" "$base_dir/ex0/etc/master.passwd"
       chmod 000 "$base_dir/ex0/etc/master.passwd" 2>/dev/null || true
     else
-      printf "${TAG_WARN} module 04 권한 테스트 리소스가 없습니다: %s/master.passwd\n" "$etc_src"
+      printf "\n${TAG_WARN} module 04 권한 테스트 리소스가 없습니다: %s/master.passwd\n" "$etc_src"
     fi
 
     printf "\n${TAG_INFO} cat ancient_fragment.txt\n"
@@ -1179,7 +1179,7 @@ run_module_04_tests() {
         cp "$etc_src/master.passwd" etc/master.passwd
         chmod 000 etc/master.passwd 2>/dev/null || true
       else
-        printf "${TAG_WARN} module 04 권한 테스트 리소스가 없습니다: %s/master.passwd\n" "$etc_src"
+        printf "\n${TAG_WARN} module 04 권한 테스트 리소스가 없습니다: %s/master.passwd\n" "$etc_src"
       fi
     ) || result=1
 
@@ -1278,7 +1278,7 @@ run_module_08_tests() {
   if [ -n "$venv_dir" ]; then
     venv_preexisting=1
     venv_dir="$(basename "$venv_dir")"
-    printf "${TAG_SKIP} 기존 가상환경이 감지되어 Python 버전 검사와 pyenv local 설정을 건너뜁니다: %s\n" "$venv_dir"
+    printf "\n${TAG_SKIP} 기존 가상환경이 감지되어 Python 버전 검사와 pyenv local 설정을 건너뜁니다: %s\n" "$venv_dir"
   else
     ensure_python_310_for_module "$base_dir" || return 1
     venv_dir="$(ensure_module_venv "$base_dir")" || return 1
@@ -1326,24 +1326,37 @@ run_module_08_ex1() {
   local base_dir="$1"
   local venv_dir="$2"
   local venv_preexisting="$3"
+  local first_run_log
+  local first_run_status
   local result=0
 
   if should_skip_empty_file "$base_dir/ex1/loading.py"; then
     return 0
   fi
 
-  printf "\n${TAG_RUN} ${YELLOW}ex1${RESET} - venv activate 후 loading.py 최초 실행\n"
+  printf "\n${TAG_RUN} ${YELLOW}ex1${RESET} - 가상환경 비활성 상태에서 loading.py 최초 실행\n"
+  first_run_log="$(mktemp)" || return 1
   (
-    cd "$base_dir" || exit 1
-    # shellcheck disable=SC1091
-    source "$venv_dir/bin/activate"
-    cd ex1 || exit 1
-    python3 loading.py
-    deactivate
-  ) || result=1
+    cd "$base_dir/ex1" || exit 1
+    set -o pipefail
+    python3 loading.py 2>&1 | tee "$first_run_log"
+  )
+  first_run_status=$?
+
+  if grep -q '^Traceback (most recent call last):' "$first_run_log"; then
+    printf "\n${TAG_ERROR} ex1 최초 실행 중 Python traceback이 감지되었습니다.\n"
+    result=1
+  elif [ "$first_run_status" -eq 1 ]; then
+    printf "\n${TAG_INFO} 의존성 누락으로 인한 종료 코드 1은 정상 테스트 결과로 처리합니다.\n"
+  elif [ "$first_run_status" -ne 0 ]; then
+    printf "\n${TAG_ERROR} ex1 최초 실행이 종료 코드 %s로 실패했습니다.\n" "$first_run_status"
+    result=1
+  fi
+
+  rm -f "$first_run_log"
 
   if [ "$venv_preexisting" -eq 1 ]; then
-    printf "${TAG_SKIP} 기존 가상환경이 감지되어 requirements.txt 설치를 건너뜁니다.\n"
+    printf "\n${TAG_SKIP} 기존 가상환경이 감지되어 requirements.txt 설치를 건너뜁니다.\n"
   elif [ -f "$base_dir/ex1/requirements.txt" ]; then
     printf "\n${TAG_RUN} ${YELLOW}ex1${RESET} - pip install -r requirements.txt\n"
     (
@@ -1357,9 +1370,9 @@ run_module_08_ex1() {
   fi
 
   if [ "$venv_preexisting" -eq 1 ]; then
-    printf "\n${TAG_RUN} ${YELLOW}ex1${RESET} - 기존 venv에서 loading.py 재실행\n"
+    printf "\n${TAG_RUN} ${YELLOW}ex1${RESET} - 기존 venv 활성화 후 loading.py 재실행\n"
   else
-    printf "\n${TAG_RUN} ${YELLOW}ex1${RESET} - requirements 설치 후 loading.py 재실행\n"
+    printf "\n${TAG_RUN} ${YELLOW}ex1${RESET} - 생성한 venv 활성화 및 requirements 설치 후 loading.py 재실행\n"
   fi
   (
     cd "$base_dir" || exit 1
@@ -1412,7 +1425,7 @@ run_module_08_poetry() {
   case "$status" in
     0) ;;
     2)
-      printf "${TAG_SKIP} poetry 테스트를 건너뜁니다.\n"
+      printf "\n${TAG_SKIP} poetry 테스트를 건너뜁니다.\n"
       return 0
       ;;
     *)
@@ -1421,7 +1434,7 @@ run_module_08_poetry() {
   esac
 
   if [ ! -f "$base_dir/ex1/pyproject.toml" ]; then
-    printf "${TAG_WARN} ex1/pyproject.toml 파일이 없습니다. poetry 테스트를 건너뜁니다.\n"
+    printf "\n${TAG_WARN} ex1/pyproject.toml 파일이 없습니다. poetry 테스트를 건너뜁니다.\n"
     return 0
   fi
 
@@ -1430,7 +1443,7 @@ run_module_08_poetry() {
   fi
 
   if [ -f "$base_dir/ex1/poetry.lock" ]; then
-    printf "${TAG_SKIP} ex1/poetry.lock이 감지되어 poetry install을 건너뜁니다.\n"
+    printf "\n${TAG_SKIP} ex1/poetry.lock이 감지되어 poetry install을 건너뜁니다.\n"
   else
     printf "\n${TAG_RUN} ${YELLOW}ex1${RESET} - poetry install\n"
     (
@@ -1484,7 +1497,7 @@ run_module_08_ex2() {
         ;;
       2)
         skip_example_env=1
-        printf "${TAG_SKIP} 기존 .env를 유지하며 .env.example 복사 및 재실행을 건너뜁니다.\n"
+        printf "\n${TAG_SKIP} 기존 .env를 유지하며 .env.example 복사 및 재실행을 건너뜁니다.\n"
         ;;
       *)
         return 1
@@ -1516,7 +1529,7 @@ run_module_08_ex2() {
       deactivate
     ) || result=1
   else
-    printf "${TAG_WARN} ex2/.env.example 파일이 없습니다.\n"
+    printf "\n${TAG_WARN} ex2/.env.example 파일이 없습니다.\n"
   fi
 
   return "$result"
@@ -1554,9 +1567,9 @@ cleanup_module_08_poetry_env() {
               fi
 
               if [ ! -d "$env_path" ]; then
-                printf "${TAG_DONE} poetry 가상환경 및 캐시 삭제 완료: %s\n" "$env_path"
+                printf "\n${TAG_DONE} poetry 가상환경 및 캐시 삭제 완료\n"
               else
-                printf "${TAG_WARN} poetry 가상환경 및 캐시 삭제 실패: %s\n" "$env_path"
+                printf "\n${TAG_WARN} poetry 가상환경 및 캐시 삭제 실패\n"
               fi
               ;;
           esac
@@ -1574,7 +1587,7 @@ ask_cleanup_module_08() {
 
   case "$answer" in
     n|N|no|NO)
-      printf "${TAG_SKIP} module 08 산출물 삭제를 건너뜁니다.\n"
+      printf "\n${TAG_SKIP} module 08 산출물 삭제를 건너뜁니다.\n"
       return 0
       ;;
   esac
@@ -1587,7 +1600,7 @@ ask_cleanup_module_08() {
 
   cleanup_module_08_poetry_env "$base_dir"
 
-  printf "${TAG_DONE} module 08 테스트 산출물 삭제 완료\n"
+  printf "\n${TAG_DONE} module 08 테스트 산출물 삭제 완료\n"
 }
 
 run_module_09_tests() {
@@ -1605,7 +1618,7 @@ run_module_09_tests() {
 
   if [ ! -f "$resource_dir/data_generator.py" ] ||
      [ ! -f "$resource_dir/data_exporter.py" ]; then
-    printf "${TAG_ERROR} module 09 리소스 파일이 없습니다.
+    printf "\n${TAG_ERROR} module 09 리소스 파일이 없습니다.
 "
     return 1
   fi
@@ -1651,7 +1664,7 @@ run_module_10_tests() {
       rm -f "$generator_dst"
     fi
   else
-    printf "${TAG_WARN} module 10 data_generator.py 리소스가 없습니다: %s\n" "$generator_src"
+    printf "\n${TAG_WARN} module 10 data_generator.py 리소스가 없습니다: %s\n" "$generator_src"
   fi
 
   run_entry_file "$base_dir/ex0" "lambda_spells.py" || result=1
@@ -2061,7 +2074,7 @@ sync_module_dir_names() {
     count="$(printf '%s' "$matched_dirs" | sed '/^$/d' | wc -l)"
 
     if [ "$count" -ge 2 ]; then
-      printf "${TAG_ERROR} module %s로 보이는 폴더가 2개 이상입니다. 이름 변경을 건너뜁니다.\n" "$module"
+      printf "\n${TAG_ERROR} module %s로 보이는 폴더가 2개 이상입니다. 이름 변경을 건너뜁니다.\n" "$module"
       printf '%s' "$matched_dirs" | sed '/^$/d'
       has_error=1
       continue
@@ -2072,7 +2085,7 @@ sync_module_dir_names() {
       dst="$expected_dir"
 
       if [ -e "$dst" ]; then
-        printf "${TAG_ERROR} 변경 대상 폴더가 이미 존재합니다: %s\n" "$dst"
+        printf "\n${TAG_ERROR} 변경 대상 폴더가 이미 존재합니다: %s\n" "$dst"
         has_error=1
         continue
       fi
@@ -2083,7 +2096,7 @@ sync_module_dir_names() {
 
   if [ -z "$(printf '%s' "$rename_pairs" | sed '/^$/d')" ]; then
     if [ "$has_error" -eq 0 ]; then
-      printf "${TAG_INFO} 변경할 모듈 폴더가 없습니다.\n"
+      printf "\n${TAG_INFO} 변경할 모듈 폴더가 없습니다.\n"
     fi
     return "$has_error"
   fi
@@ -2100,7 +2113,7 @@ sync_module_dir_names() {
 
   case "$answer" in
     n|N|no|NO)
-      printf "${TAG_SKIP} 폴더명 변경을 건너뜁니다.\n"
+      printf "\n${TAG_SKIP} 폴더명 변경을 건너뜁니다.\n"
       return "$has_error"
       ;;
   esac
@@ -2109,13 +2122,13 @@ sync_module_dir_names() {
     [ -z "$src" ] && continue
 
     if [ -e "$dst" ]; then
-      printf "${TAG_ERROR} 변경 대상 폴더가 이미 존재하여 건너뜁니다: %s\n" "$dst"
+      printf "\n${TAG_ERROR} 변경 대상 폴더가 이미 존재하여 건너뜁니다: %s\n" "$dst"
       has_error=1
       continue
     fi
 
     mv "$src" "$dst"
-    printf "${TAG_DONE} 폴더명 변경: %s -> %s\n" "$(basename "$src")" "$(basename "$dst")"
+    printf "\n${TAG_DONE} 폴더명 변경: %s -> %s\n" "$(basename "$src")" "$(basename "$dst")"
   done <<< "$rename_pairs"
 
   return "$has_error"
@@ -2124,24 +2137,24 @@ sync_module_dir_names() {
 reset_helper_config() {
   local answer
 
-  printf "${TAG_WARN} 헬퍼 설정을 초기화하시겠습니까? [Y/n] "
+  printf "\n${TAG_WARN} 헬퍼 설정을 초기화하시겠습니까? [Y/n] "
   read -r answer
 
   case "$answer" in
     n|N|no|NO)
-      printf "${TAG_SKIP} 설정 초기화를 취소했습니다.\n"
+      printf "\n${TAG_SKIP} 설정 초기화를 취소했습니다.\n"
       ;;
     *)
       if [ -f "$BASE_CONFIG_FILE" ]; then
         cp "$BASE_CONFIG_FILE" "$CONFIG_FILE"
         # shellcheck disable=SC1090
         source "$CONFIG_FILE"
-        printf "${TAG_DONE} 헬퍼 설정을 base.env 기준으로 초기화했습니다.\n"
+        printf "\n${TAG_DONE} 헬퍼 설정을 base.env 기준으로 초기화했습니다.\n"
       else
         rm -f "$CONFIG_FILE"
         PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
         MODULE_DIR_NAME="python_module_"
-        printf "${TAG_DONE} 헬퍼 설정을 기본값으로 초기화했습니다.\n"
+        printf "\n${TAG_DONE} 헬퍼 설정을 기본값으로 초기화했습니다.\n"
       fi
       ;;
   esac
@@ -2157,13 +2170,13 @@ select_project_root() {
   read -e -r new_root
 
   if [ ! -d "$new_root" ]; then
-    printf "${TAG_ERROR} 존재하지 않는 경로입니다: %s\n" "$new_root"
+    printf "\n${TAG_ERROR} 존재하지 않는 경로입니다: %s\n" "$new_root"
     return 1
   fi
 
   PROJECT_ROOT="$new_root"
   save_config
-  printf "${TAG_DONE} 프로젝트 루트가 저장되었습니다: %s\n" "$PROJECT_ROOT"
+  printf "\n${TAG_DONE} 프로젝트 루트가 저장되었습니다: %s\n" "$PROJECT_ROOT"
 
 	sync_module_dir_names
 }
@@ -2182,7 +2195,7 @@ select_module_dir_name() {
 
   MODULE_DIR_NAME="$new_name"
   save_config
-  printf "${TAG_DONE} 모듈 폴더명 서식이 저장되었습니다: %s\n" "$MODULE_DIR_NAME"
+  printf "\n${TAG_DONE} 모듈 폴더명 서식이 저장되었습니다: %s\n" "$MODULE_DIR_NAME"
 
 	sync_module_dir_names
 }
@@ -2192,19 +2205,19 @@ update_helper_from_git() {
   local behind_count
 
   if [ ! -d "$SCRIPT_DIR/.git" ]; then
-    printf "${TAG_ERROR} 현재 헬퍼 디렉토리가 git 저장소가 아닙니다: %s\n" "$SCRIPT_DIR"
+    printf "\n${TAG_ERROR} 현재 헬퍼 디렉토리가 git 저장소가 아닙니다: %s\n" "$SCRIPT_DIR"
     return 1
   fi
 
   if ! git -C "$SCRIPT_DIR" fetch origin main >/dev/null 2>&1; then
-    printf "${TAG_ERROR} 원격 저장소 확인에 실패했습니다.\n"
+    printf "\n${TAG_ERROR} 원격 저장소 확인에 실패했습니다.\n"
     return 1
   fi
 
   behind_count="$(git -C "$SCRIPT_DIR" rev-list --count HEAD..origin/main 2>/dev/null)"
 
   if [ -z "$behind_count" ] || [ "$behind_count" -eq 0 ]; then
-    printf "${TAG_INFO} 현재 최신버전입니다.\n"
+    printf "\n${TAG_INFO} 현재 최신버전입니다.\n"
     return 0
   fi
 
@@ -2216,17 +2229,17 @@ update_helper_from_git() {
 
   case "$answer" in
     n|N|no|NO)
-      printf "${TAG_SKIP} 헬퍼 업데이트를 건너뜁니다.\n"
+      printf "\n${TAG_SKIP} 헬퍼 업데이트를 건너뜁니다.\n"
       return 0
       ;;
   esac
 
   if git -C "$SCRIPT_DIR" pull --ff-only origin main; then
-    printf "${TAG_DONE} 헬퍼 업데이트가 완료되었습니다. 다시 실행해주세요.\n"
+    printf "\n${TAG_DONE} 헬퍼 업데이트가 완료되었습니다. 다시 실행해주세요.\n"
     exit 0
   fi
 
-  printf "${TAG_ERROR} 헬퍼 업데이트에 실패했습니다.\n"
+  printf "\n${TAG_ERROR} 헬퍼 업데이트에 실패했습니다.\n"
   return 1
 }
 
@@ -2271,7 +2284,7 @@ helper_settings_menu() {
         return 0
         ;;
       *)
-        printf "${TAG_ERROR} 잘못된 입력입니다.\n"
+        printf "\n${TAG_ERROR} 잘못된 입력입니다.\n"
         pause
         ;;
     esac
@@ -2291,7 +2304,7 @@ show_manual() {
   print_line
 
   if [ ! -f "$manual_file" ]; then
-    printf "${TAG_WARN} 메뉴얼 파일이 없습니다: %s\n" "$manual_file"
+    printf "\n${TAG_WARN} 메뉴얼 파일이 없습니다: %s\n" "$manual_file"
     return 1
   fi
 
@@ -2360,7 +2373,7 @@ main_menu() {
         exit 0
         ;;
       *)
-        printf "${TAG_ERROR} 잘못된 입력입니다.\n"
+        printf "\n${TAG_ERROR} 잘못된 입력입니다.\n"
         pause
         ;;
     esac
