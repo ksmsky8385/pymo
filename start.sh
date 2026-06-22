@@ -1743,7 +1743,7 @@ ask_cleanup_module_09() {
   local venv_created="$3"
   local answer
 
-  printf "\n${TAG_WARN} module 09 테스트에서 생성한 venv, data_generator, generated_data를 삭제하겠습니까? [Y/n] "
+  printf "\n${TAG_WARN} 생성한 venv, data_generator, generated_data를 삭제하겠습니까? [Y/n] "
   read -r answer
 
   case "$answer" in
