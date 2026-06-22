@@ -273,7 +273,7 @@ remove_pycache() {
 remove_mypy_cache() {
   local base_dir="$1"
 
-  [ -d "$base_dir/.mypy_cache" ] && rm -rf "$base_dir/.mypy_cache"
+  [ -d "$base_dir" ] && find "$base_dir" -type d -name '.mypy_cache' -prune -exec rm -rf {} +
 }
 
 # ==============================
@@ -1695,20 +1695,20 @@ run_module_09_tests() {
     venv_created=1
     printf "\n${TAG_CREATE} 가상환경을 생성합니다: venv\n"
     if ! python3 -m venv "$venv_path"; then
-      ask_cleanup_module_09 "$base_dir" "$venv_path" "$venv_created"
+      ask_cleanup_module_09 "$base_dir" "$venv_path"
       return 1
     fi
   fi
 
   if [ ! -f "$venv_path/bin/activate" ]; then
     printf "\n${TAG_ERROR} 가상환경 활성화 파일이 없습니다: %s/bin/activate\n" "$venv_path"
-    ask_cleanup_module_09 "$base_dir" "$venv_path" "$venv_created"
+    ask_cleanup_module_09 "$base_dir" "$venv_path"
     return 1
   fi
 
   if ! cp -R "$resource_dir" "$base_dir/"; then
     printf "\n${TAG_ERROR} data_generator 복사에 실패했습니다.\n"
-    ask_cleanup_module_09 "$base_dir" "$venv_path" "$venv_created"
+    ask_cleanup_module_09 "$base_dir" "$venv_path"
     return 1
   fi
 
@@ -1732,7 +1732,7 @@ run_module_09_tests() {
     exit "$result"
   ) || result=1
 
-  ask_cleanup_module_09 "$base_dir" "$venv_path" "$venv_created"
+  ask_cleanup_module_09 "$base_dir" "$venv_path"
 
   return "$result"
 }
@@ -1740,10 +1740,10 @@ run_module_09_tests() {
 ask_cleanup_module_09() {
   local base_dir="$1"
   local venv_path="$2"
-  local venv_created="$3"
   local answer
 
-  printf "\n${TAG_WARN} 생성한 venv, data_generator, generated_data를 삭제하겠습니까? [Y/n] "
+  printf "\n${TAG_WARN} 사용한 가상환경(%s), data_generator, generated_data를 삭제하겠습니까? [Y/n] " \
+    "$(basename "$venv_path")"
   read -r answer
 
   case "$answer" in
@@ -1753,7 +1753,7 @@ ask_cleanup_module_09() {
       ;;
   esac
 
-  if [ "$venv_created" -eq 1 ] && [ -n "$venv_path" ]; then
+  if [ -n "$venv_path" ]; then
     rm -rf "$venv_path"
   fi
   rm -rf "$base_dir/data_generator"
