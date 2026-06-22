@@ -173,7 +173,6 @@ MODULE_08_FILES=(
   "ex1/pyproject.toml"
   "ex2/oracle.py"
   "ex2/.env.example"
-
   "ex2/.gitignore"
 )
 
@@ -407,16 +406,14 @@ print_registered_modules_with_status() {
 # 테스트 메뉴
 # ==============================
 
-run_tests_for_module() {
+run_tests_for_module_at_dir() {
   local module="$1"
-  local base_dir
+  local base_dir="$2"
 
   if ! is_registered_module "$module"; then
     printf "\n${TAG_ERROR} 등록되지 않은 module 번호입니다: %s\n" "$module"
     return 1
   fi
-
-  base_dir="$(module_dir "$module")"
 
   if [ ! -d "$base_dir" ]; then
     printf "\n${TAG_ERROR} 과제 폴더가 없습니다: %s\n" "$base_dir"
@@ -444,14 +441,90 @@ run_tests_for_module() {
   printf "\n${TAG_DONE} 테스트 종료 및 캐시 정리 완료: python module %s\n" "$module"
 }
 
+run_tests_for_module() {
+  local module="$1"
+
+  run_tests_for_module_at_dir "$module" "$(module_dir "$module")"
+}
+
+run_eval_mode() {
+  local eval_root
+  local dir
+  local module
+  local choice
+  local index
+  local selected_dir
+  local selected_module
+  local -a detected_dirs=()
+  local -a detected_modules=()
+
+  printf '\neval mode : 경로를 입력하세요.\n\n> '
+  read -e -r eval_root
+
+  if [ ! -d "$eval_root" ]; then
+    printf "\n${TAG_ERROR} 존재하지 않는 경로입니다: %s\n" "$eval_root"
+    return 1
+  fi
+
+  eval_root="$(cd "$eval_root" && pwd)"
+
+  while IFS= read -r -d '' dir; do
+    for module in "${REGISTERED_MODULES[@]}"; do
+      if looks_like_module_dir "$module" "$dir"; then
+        detected_dirs+=("$dir")
+        detected_modules+=("$module")
+      fi
+    done
+  done < <(find "$eval_root" -mindepth 1 -maxdepth 1 -type d -print0)
+
+  if [ "${#detected_dirs[@]}" -eq 0 ]; then
+    printf "\n${TAG_INFO} 모듈 과제 폴더를 찾지 못했습니다: %s\n" "$eval_root"
+    return 1
+  fi
+
+  printf "\n${TAG_INFO} 감지된 모듈 과제 폴더:\n\n"
+  for ((index = 0; index < ${#detected_dirs[@]}; index++)); do
+    printf '%d. %s - module %s\n' \
+      "$((index + 1))" "$(basename "${detected_dirs[$index]}")" \
+      "${detected_modules[$index]}"
+  done
+
+  printf '\n테스트할 항목 번호를 입력하세요.\n> '
+  read -r choice
+
+  if ! [[ "$choice" =~ ^[0-9]+$ ]] ||
+     [ "$choice" -lt 1 ] || [ "$choice" -gt "${#detected_dirs[@]}" ]; then
+    printf "\n${TAG_ERROR} 잘못된 항목 번호입니다: %s\n" "$choice"
+    return 1
+  fi
+
+  index=$((choice - 1))
+  selected_dir="${detected_dirs[$index]}"
+  selected_module="${detected_modules[$index]}"
+
+  printf "\n${TAG_INFO} 평가 경로: %s (module %s)\n" \
+    "$selected_dir" "$selected_module"
+
+  (
+    cd "$selected_dir" || exit 1
+    run_tests_for_module_at_dir "$selected_module" "$PWD"
+  )
+}
+
 select_test_module() {
   local module
 
   print_line
-  printf '테스트할 module 번호를 입력하세요.\n\n'
+  printf '테스트할 module 번호 또는 eval을 입력하세요.\n\n'
+  printf '(eval = 지정 경로에서 모듈 과제 폴더 검색 및 테스트)\n\n'
   print_registered_modules_with_status "test"
   printf '\n> '
   read -r module
+
+  if [ "$module" = "eval" ] || [ "$module" = "EVAL" ]; then
+    run_eval_mode
+    return $?
+  fi
 
   if [[ "$module" =~ ^[0-9]$ ]]; then
     module="0$module"
@@ -538,11 +611,11 @@ run_flake8() {
 
   case "$status" in
     0)
-      (cd "$base_dir" || exit 1; flake8 . --extend-exclude='*env')
+      (cd "$base_dir" || exit 1; flake8 . --extend-exclude='*env,data_generator,generated_data')
       result=$?
       ;;
     2)
-      (cd "$base_dir" || exit 1; python3 -m flake8 . --extend-exclude='*env')
+      (cd "$base_dir" || exit 1; python3 -m flake8 . --extend-exclude='*env,data_generator,generated_data')
       result=$?
       ;;
     3)
@@ -567,7 +640,11 @@ run_mypy_command() {
 
   mapfile -d '' files < <(
     find . \
-      -type d -name '*env' -prune -o \
+      -type d \( \
+        -name '*env' -o \
+        -name 'data_generator' -o \
+        -name 'generated_data' \
+      \) -prune -o \
       -type f -name '*.py' ! -path './main.py' -print0
   )
 
@@ -1468,7 +1545,7 @@ run_module_08_ex2() {
     source "$venv_dir/bin/activate"
 
     if ! python3 -c 'import dotenv' >/dev/null 2>&1; then
-      pip install python-dotenv
+      pip install python-dotenv --no-cache-dir
     fi
 
     deactivate
@@ -1595,41 +1672,94 @@ ask_cleanup_module_08() {
 }
 
 run_module_09_tests() {
-  local _module="$1"
   local base_dir="$2"
-  local resource_dir="$SCRIPT_DIR/resource/module_09"
+  local resource_dir="$SCRIPT_DIR/resource/module_09/data_generator"
+  local venv_path
+  local venv_created=0
   local result=0
 
   printf "\n${TAG_TEST} python module 09 실행 테스트\n"
 
-  if [ ! -f "$base_dir/.venv/bin/activate" ]; then
-    run_in_venv "$base_dir" true
-    return 1
-  fi
-
   if [ ! -f "$resource_dir/data_generator.py" ] ||
      [ ! -f "$resource_dir/data_exporter.py" ]; then
-    printf "\n${TAG_ERROR} module 09 리소스 파일이 없습니다.
-"
+    printf "\n${TAG_ERROR} module 09 data_generator 리소스가 없습니다: %s\n" "$resource_dir"
     return 1
   fi
 
-  cp "$resource_dir/data_generator.py" "$base_dir/data_generator.py"
-  cp "$resource_dir/data_exporter.py" "$base_dir/data_exporter.py"
+  venv_path="$(find "$base_dir" -mindepth 1 -maxdepth 1 -type d -name '*env' | head -n 1)"
 
-  run_venv_file "$base_dir" "data_generator.py" || result=1
-  run_venv_file "$base_dir" "data_exporter.py" || result=1
+  if [ -n "$venv_path" ]; then
+    printf "\n${TAG_INFO} 기존 가상환경을 활성화합니다: %s\n" "$(basename "$venv_path")"
+  else
+    venv_path="$base_dir/venv"
+    venv_created=1
+    printf "\n${TAG_CREATE} 가상환경을 생성합니다: venv\n"
+    if ! python3 -m venv "$venv_path"; then
+      ask_cleanup_module_09 "$base_dir" "$venv_path" "$venv_created"
+      return 1
+    fi
+  fi
 
-  run_venv_file "$base_dir" "ex0/space_station.py" || result=1
-  run_venv_file "$base_dir" "ex1/alien_contact.py" || result=1
-  run_venv_file "$base_dir" "ex2/space_crew.py" || result=1
+  if [ ! -f "$venv_path/bin/activate" ]; then
+    printf "\n${TAG_ERROR} 가상환경 활성화 파일이 없습니다: %s/bin/activate\n" "$venv_path"
+    ask_cleanup_module_09 "$base_dir" "$venv_path" "$venv_created"
+    return 1
+  fi
 
-  rm -f "$base_dir/data_generator.py"
-  rm -f "$base_dir/data_exporter.py"
+  if ! cp -R "$resource_dir" "$base_dir/"; then
+    printf "\n${TAG_ERROR} data_generator 복사에 실패했습니다.\n"
+    ask_cleanup_module_09 "$base_dir" "$venv_path" "$venv_created"
+    return 1
+  fi
 
-  ask_remove_generated_files "$_module" "$base_dir"
+  (
+    # shellcheck disable=SC1091
+    source "$venv_path/bin/activate" || exit 1
+
+    if [ "$venv_created" -eq 1 ]; then
+      printf "\n${TAG_RUN} venv - pip install pydantic --no-cache-dir\n"
+      python3 -m pip install pydantic --no-cache-dir || exit 1
+    fi
+
+    printf "\n${TAG_RUN} data_generator - python3 data_generator/data_exporter.py\n"
+    (cd "$base_dir" || exit 1; python3 data_generator/data_exporter.py) || exit 1
+
+    run_entry_file "$base_dir/ex0" "space_station.py" || result=1
+    run_entry_file "$base_dir/ex1" "alien_contact.py" || result=1
+    run_entry_file "$base_dir/ex2" "space_crew.py" || result=1
+
+    deactivate
+    exit "$result"
+  ) || result=1
+
+  ask_cleanup_module_09 "$base_dir" "$venv_path" "$venv_created"
 
   return "$result"
+}
+
+ask_cleanup_module_09() {
+  local base_dir="$1"
+  local venv_path="$2"
+  local venv_created="$3"
+  local answer
+
+  printf "\n${TAG_WARN} module 09 테스트에서 생성한 venv, data_generator, generated_data를 삭제하겠습니까? [Y/n] "
+  read -r answer
+
+  case "$answer" in
+    n|N|no|NO)
+      printf "\n${TAG_SKIP} module 09 테스트 산출물 삭제를 건너뜁니다.\n"
+      return 0
+      ;;
+  esac
+
+  if [ "$venv_created" -eq 1 ] && [ -n "$venv_path" ]; then
+    rm -rf "$venv_path"
+  fi
+  rm -rf "$base_dir/data_generator"
+  rm -rf "$base_dir/generated_data"
+
+  printf "\n${TAG_DONE} module 09 테스트 산출물 삭제 완료\n"
 }
 
 run_module_10_tests() {
@@ -2026,12 +2156,12 @@ looks_like_module_dir() {
   while IFS= read -r item; do
     [ -z "$item" ] && continue
 
-    if [ -e "$dir/$item" ]; then
-      return 0
+    if [ ! -e "$dir/$item" ]; then
+      return 1
     fi
   done < <(get_module_files "$module")
 
-  return 1
+  return 0
 }
 
 sync_module_dir_names() {
@@ -2052,8 +2182,7 @@ sync_module_dir_names() {
     expected_name="$(basename "$expected_dir")"
     matched_dirs=""
 
-		for dir in "$PROJECT_ROOT"/*"$module"*; do
-    # for dir in "$PROJECT_ROOT"/*; do
+    for dir in "$PROJECT_ROOT"/*; do
       [ -d "$dir" ] || continue
       [ "$dir" = "$expected_dir" ] && continue
 
