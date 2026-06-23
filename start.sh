@@ -2329,12 +2329,12 @@ update_helper_from_git() {
     return 1
   fi
 
-  if ! git -C "$SCRIPT_DIR" fetch origin main >/dev/null 2>&1; then
+  if ! git -C "$SCRIPT_DIR" fetch --quiet origin main >/dev/null 2>&1; then
     printf "\n${TAG_ERROR} 원격 저장소 확인에 실패했습니다.\n"
     return 1
   fi
 
-  behind_count="$(git -C "$SCRIPT_DIR" rev-list --count HEAD..origin/main 2>/dev/null)"
+  behind_count="$(git -C "$SCRIPT_DIR" --no-pager rev-list --count HEAD..origin/main 2>/dev/null)"
 
   if [ -z "$behind_count" ] || [ "$behind_count" -eq 0 ]; then
     printf "\n${TAG_INFO} 현재 최신버전입니다.\n"
@@ -2342,9 +2342,9 @@ update_helper_from_git() {
   fi
 
   printf "\n${TAG_INFO} 헬퍼 업데이트가 가능합니다.\n"
-  printf '업데이트 로그:\n\n'
-  git -C "$SCRIPT_DIR" log --oneline --no-merges HEAD..origin/main
-  printf '\n'
+  printf '업데이트 커밋: %s개\n\n' "$behind_count"
+  git -C "$SCRIPT_DIR" --no-pager log --oneline --no-merges HEAD..origin/main
+  printf '\n업데이트를 진행하시겠습니까? [Y/n] '
   read -r answer
 
   case "$answer" in
@@ -2354,7 +2354,7 @@ update_helper_from_git() {
       ;;
   esac
 
-  if git -C "$SCRIPT_DIR" pull --ff-only origin main; then
+  if git -C "$SCRIPT_DIR" pull --ff-only --no-stat origin main; then
     printf "\n${TAG_DONE} 헬퍼 업데이트가 완료되었습니다. 다시 실행해주세요.\n"
     exit 0
   fi
