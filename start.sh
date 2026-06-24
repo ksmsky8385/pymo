@@ -611,11 +611,11 @@ run_flake8() {
 
   case "$status" in
     0)
-      (cd "$base_dir" || exit 1; flake8 . --extend-exclude='*env,data_generator,generated_data')
+      (cd "$base_dir" || exit 1; flake8 . --extend-exclude='*env,data_generator,data_generator.py,generated_data')
       result=$?
       ;;
     2)
-      (cd "$base_dir" || exit 1; python3 -m flake8 . --extend-exclude='*env,data_generator,generated_data')
+      (cd "$base_dir" || exit 1; python3 -m flake8 . --extend-exclude='*env,data_generator,data_generator.py,generated_data')
       result=$?
       ;;
     3)
@@ -645,7 +645,9 @@ run_mypy_command() {
         -name 'data_generator' -o \
         -name 'generated_data' \
       \) -prune -o \
-      -type f -name '*.py' ! -path './main.py' -print0
+      -type f -name '*.py' \
+      ! -name 'data_generator.py' \
+      ! -path './main.py' -print0
   )
 
   if [ "${#files[@]}" -eq 0 ]; then
@@ -1767,32 +1769,78 @@ run_module_10_tests() {
   local base_dir="$2"
   local resource_dir="$SCRIPT_DIR/resource/module_10"
   local generator_src="$resource_dir/data_generator.py"
-  local generator_dst="$base_dir/data_generator.py"
+  local existing_generator
   local result=0
 
   printf "\n${TAG_TEST} python module 10 실행 테스트\n"
 
-  if [ -f "$generator_src" ]; then
-    if should_skip_empty_file "$generator_src"; then
-      :
-    else
-      cp "$generator_src" "$generator_dst"
-      printf "\n${TAG_TEST} data_generator.py 전체 샘플 출력\n"
-      (
-        cd "$base_dir" || exit 1
-        printf '5\nq\n' | python3 data_generator.py
-      ) || result=1
-      rm -f "$generator_dst"
-    fi
-  else
-    printf "\n${TAG_WARN} module 10 data_generator.py 리소스가 없습니다: %s\n" "$generator_src"
+  existing_generator="$(find "$base_dir" -type f -name 'data_generator.py' | head -n 1)"
+
+  if [ -n "$existing_generator" ]; then
+    printf "\n${TAG_SKIP} 모듈 하위 경로의 data_generator.py가 감지되어 임시 복사를 생략합니다: %s\n" "$existing_generator"
+    run_entry_file "$base_dir/ex0" "lambda_spells.py" || result=1
+    run_entry_file "$base_dir/ex1" "higher_magic.py" || result=1
+    run_entry_file "$base_dir/ex2" "scope_mysteries.py" || result=1
+    run_entry_file "$base_dir/ex3" "functools_artifacts.py" || result=1
+    run_entry_file "$base_dir/ex4" "decorator_mastery.py" || result=1
+    return "$result"
   fi
 
-  run_entry_file "$base_dir/ex0" "lambda_spells.py" || result=1
-  run_entry_file "$base_dir/ex1" "higher_magic.py" || result=1
-  run_entry_file "$base_dir/ex2" "scope_mysteries.py" || result=1
-  run_entry_file "$base_dir/ex3" "functools_artifacts.py" || result=1
-  run_entry_file "$base_dir/ex4" "decorator_mastery.py" || result=1
+  if [ ! -f "$generator_src" ]; then
+    printf "\n${TAG_ERROR} module 10 data_generator.py 리소스가 없습니다: %s\n" "$generator_src"
+    return 1
+  fi
+
+  if should_skip_empty_file "$generator_src"; then
+    return 1
+  fi
+
+  run_module_10_entry_file "$base_dir/ex0" "lambda_spells.py" "$generator_src" || result=1
+  run_module_10_entry_file "$base_dir/ex1" "higher_magic.py" "$generator_src" || result=1
+  run_module_10_entry_file "$base_dir/ex2" "scope_mysteries.py" "$generator_src" || result=1
+  run_module_10_entry_file "$base_dir/ex3" "functools_artifacts.py" "$generator_src" || result=1
+  run_module_10_entry_file "$base_dir/ex4" "decorator_mastery.py" "$generator_src" || result=1
+
+  return "$result"
+}
+
+run_module_10_entry_file() {
+  local run_dir="$1"
+  local file_name="$2"
+  local generator_src="$3"
+  local generator_dst="$run_dir/data_generator.py"
+  local backup_dst="$run_dir/.pymo_data_generator.py.bak"
+  local had_existing=0
+  local result=0
+
+  if [ ! -d "$run_dir" ]; then
+    printf "\n${TAG_WARN} ex 폴더 없음: %s\n" "$run_dir"
+    return 1
+  fi
+
+  if [ -e "$generator_dst" ]; then
+    had_existing=1
+    if ! mv "$generator_dst" "$backup_dst"; then
+      printf "\n${TAG_ERROR} 기존 data_generator.py 백업에 실패했습니다: %s\n" "$generator_dst"
+      return 1
+    fi
+  fi
+
+  if ! cp "$generator_src" "$generator_dst"; then
+    printf "\n${TAG_ERROR} data_generator.py 복사에 실패했습니다: %s\n" "$run_dir"
+    if [ "$had_existing" -eq 1 ]; then
+      mv "$backup_dst" "$generator_dst"
+    fi
+    return 1
+  fi
+
+  printf "\n${TAG_INFO} data_generator.py 임시 복사: %s\n" "$generator_dst"
+  run_entry_file "$run_dir" "$file_name" || result=1
+  rm -f "$generator_dst"
+  if [ "$had_existing" -eq 1 ]; then
+    mv "$backup_dst" "$generator_dst"
+  fi
+  printf "\n${TAG_DONE} data_generator.py 삭제 완료: %s\n" "$generator_dst"
 
   return "$result"
 }
