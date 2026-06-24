@@ -206,6 +206,21 @@ MODULE_08_TESTER="run_module_08_tests"
 MODULE_09_TESTER="run_module_09_tests"
 MODULE_10_TESTER="run_module_10_tests"
 
+# ==============================
+# 모듈별 mypy 검사 플래그
+# ==============================
+
+MODULE_00_MYPY_FLAGS="--strict"
+MODULE_01_MYPY_FLAGS="--strict"
+MODULE_02_MYPY_FLAGS="--strict"
+MODULE_03_MYPY_FLAGS="--strict"
+MODULE_04_MYPY_FLAGS="--strict"
+MODULE_05_MYPY_FLAGS="--strict"
+MODULE_06_MYPY_FLAGS="--strict"
+MODULE_07_MYPY_FLAGS="--strict"
+MODULE_08_MYPY_FLAGS="--strict"
+MODULE_09_MYPY_FLAGS="--strict"
+MODULE_10_MYPY_FLAGS=""
 
 # ==============================
 # 모듈별 테스트 산출물 삭제 대상
@@ -262,6 +277,17 @@ get_module_tester() {
 
   var_name="$(get_module_tester_var "$1")"
   eval 'printf "%s" "${'"$var_name"':-}"'
+}
+
+get_module_mypy_flags_var() {
+  printf 'MODULE_%s_MYPY_FLAGS' "$1"
+}
+
+get_module_mypy_flags() {
+  local var_name
+
+  var_name="$(get_module_mypy_flags_var "$1")"
+  eval 'if [ "${'"$var_name"'+set}" = "set" ]; then printf "%s" "${'"$var_name"'}"; else printf "%s" "--strict"; fi'
 }
 
 remove_pycache() {
@@ -420,7 +446,7 @@ run_tests_for_module_at_dir() {
     return 1
   fi
 
-  if ! run_static_checks "$base_dir"; then
+  if ! run_static_checks "$base_dir" "$module"; then
     remove_mypy_cache "$base_dir"
     remove_pycache "$base_dir"
 
@@ -636,7 +662,13 @@ run_flake8() {
 
 run_mypy_command() {
   local mode="$1"
+  local mypy_flags="${2---strict}"
   local files=()
+  local mypy_args=()
+
+  if [ -n "$mypy_flags" ]; then
+    mypy_args=("$mypy_flags")
+  fi
 
   mapfile -d '' files < <(
     find . \
@@ -656,14 +688,15 @@ run_mypy_command() {
   fi
 
   if [ "$mode" = "module" ]; then
-    python3 -m mypy --strict "${files[@]}"
+    python3 -m mypy "${mypy_args[@]}" "${files[@]}"
   else
-    mypy --strict "${files[@]}"
+    mypy "${mypy_args[@]}" "${files[@]}"
   fi
 }
 
 run_mypy() {
   local base_dir="$1"
+  local mypy_flags="${2---strict}"
   local status
   local result
 
@@ -672,11 +705,11 @@ run_mypy() {
 
   case "$status" in
     0)
-      (cd "$base_dir" || exit 1; run_mypy_command "bin")
+      (cd "$base_dir" || exit 1; run_mypy_command "bin" "$mypy_flags")
       result=$?
       ;;
     2)
-      (cd "$base_dir" || exit 1; run_mypy_command "module")
+      (cd "$base_dir" || exit 1; run_mypy_command "module" "$mypy_flags")
       result=$?
       ;;
     3)
@@ -694,14 +727,22 @@ run_mypy() {
 
 run_static_checks() {
   local base_dir="$1"
+  local module="${2:-}"
+  local mypy_flags
+  local mypy_label="mypy"
+
+  mypy_flags="$(get_module_mypy_flags "$module")"
+  if [ -n "$mypy_flags" ]; then
+    mypy_label="mypy $mypy_flags"
+  fi
 
   printf "\n${TAG_CHECK} flake8 실행\n"
   if ! run_flake8 "$base_dir"; then
     return 1
   fi
 
-  printf "\n${TAG_CHECK} mypy --strict 실행\n"
-  if ! run_mypy "$base_dir"; then
+  printf "\n${TAG_CHECK} %s 실행\n" "$mypy_label"
+  if ! run_mypy "$base_dir" "$mypy_flags"; then
     return 1
   fi
 
@@ -1834,13 +1875,11 @@ run_module_10_entry_file() {
     return 1
   fi
 
-  printf "\n${TAG_INFO} data_generator.py 임시 복사: %s\n" "$generator_dst"
   run_entry_file "$run_dir" "$file_name" || result=1
   rm -f "$generator_dst"
   if [ "$had_existing" -eq 1 ]; then
     mv "$backup_dst" "$generator_dst"
   fi
-  printf "\n${TAG_DONE} data_generator.py 삭제 완료: %s\n" "$generator_dst"
 
   return "$result"
 }

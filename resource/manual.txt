@@ -55,9 +55,21 @@
 
       1) 파일 존재여부 검사
       2) flake8 검사
-      3) mypy --strict 검사
+      3) module별 설정값에 따른 mypy 검사
       4) 실행 테스트
       5) .mypy_cache 및 __pycache__ 삭제
+
+    mypy 검사 기준은 start.sh 최상단의 MODULE_XX_MYPY_FLAGS 상수로 정합니다.
+
+      MODULE_00_MYPY_FLAGS="--strict"
+      ...
+      MODULE_09_MYPY_FLAGS="--strict"
+      MODULE_10_MYPY_FLAGS=""
+
+    값이 "--strict"이면 mypy --strict 기준으로 검사하고,
+    빈 문자열("")이면 strict 플래그 없이 mypy 기준으로 검사합니다.
+    특정 module의 검사 기준을 바꾸려면 해당 MODULE_XX_MYPY_FLAGS 값만
+    수정하면 됩니다.
 
     flake8 또는 mypy가 설치되어 있지 않으면 다음 선택지를 제공합니다.
 
