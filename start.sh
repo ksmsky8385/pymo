@@ -1810,6 +1810,9 @@ run_module_10_tests() {
   local base_dir="$2"
   local resource_dir="$SCRIPT_DIR/resource/module_10"
   local generator_src="$resource_dir/data_generator.py"
+  local root_generator_dst="$base_dir/data_generator.py"
+  local root_backup_dst="$base_dir/.pymo_data_generator.py.bak"
+  local root_had_existing=0
   local existing_generator
   local result=0
 
@@ -1836,11 +1839,32 @@ run_module_10_tests() {
     return 1
   fi
 
+  if [ -e "$root_generator_dst" ]; then
+    root_had_existing=1
+    if ! mv "$root_generator_dst" "$root_backup_dst"; then
+      printf "\n${TAG_ERROR} 기존 루트 data_generator.py 백업에 실패했습니다: %s\n" "$root_generator_dst"
+      return 1
+    fi
+  fi
+
+  if ! cp "$generator_src" "$root_generator_dst"; then
+    printf "\n${TAG_ERROR} 루트 data_generator.py 복사에 실패했습니다: %s\n" "$base_dir"
+    if [ "$root_had_existing" -eq 1 ]; then
+      mv "$root_backup_dst" "$root_generator_dst"
+    fi
+    return 1
+  fi
+
   run_module_10_entry_file "$base_dir/ex0" "lambda_spells.py" "$generator_src" || result=1
   run_module_10_entry_file "$base_dir/ex1" "higher_magic.py" "$generator_src" || result=1
   run_module_10_entry_file "$base_dir/ex2" "scope_mysteries.py" "$generator_src" || result=1
   run_module_10_entry_file "$base_dir/ex3" "functools_artifacts.py" "$generator_src" || result=1
   run_module_10_entry_file "$base_dir/ex4" "decorator_mastery.py" "$generator_src" || result=1
+
+  rm -f "$root_generator_dst"
+  if [ "$root_had_existing" -eq 1 ]; then
+    mv "$root_backup_dst" "$root_generator_dst"
+  fi
 
   return "$result"
 }
